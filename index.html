@@ -9,23 +9,24 @@
 <style>
 :root{
   --sea:#E4EBEE; --ink:#1B2A31; --muted:#56666E; --panel:rgba(255,255,255,.95); --edge:rgba(27,42,49,.14);
-  --btn:#FFFFFF; --btn-on:#1B2A31; --btn-on-ink:#FFFFFF; --sgg:rgba(27,42,49,.58); --sido:rgba(27,42,49,.88); --casing:rgba(255,255,255,.55); --coast:rgba(27,42,49,.35);
+  --btn:#FFFFFF; --btn-on:#1B2A31; --btn-on-ink:#FFFFFF; --sgg:rgba(27,42,49,.58); --sido:rgba(27,42,49,.88); --casing:rgba(255,255,255,.55); --coast:rgba(27,42,49,.35); --land:#D3DADD; --line:rgba(255,255,255,.6);
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
   font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --sea:#0E1920; --ink:#E4ECEF; --muted:#9CACB3; --panel:rgba(16,27,33,.95); --edge:rgba(228,236,239,.14);
-  --btn:#16252C; --btn-on:#E4ECEF; --btn-on-ink:#0E1920; --sgg:rgba(228,236,239,.52); --sido:rgba(228,236,239,.88); --casing:rgba(14,25,32,.55); --coast:rgba(228,236,239,.3); } }
+  --btn:#16252C; --btn-on:#E4ECEF; --btn-on-ink:#0E1920; --sgg:rgba(228,236,239,.52); --sido:rgba(228,236,239,.88); --casing:rgba(14,25,32,.55); --coast:rgba(228,236,239,.3); --land:#26333A; --line:rgba(14,25,32,.5); } }
 :root[data-theme="dark"]{ --sea:#0E1920; --ink:#E4ECEF; --muted:#9CACB3; --panel:rgba(16,27,33,.95); --edge:rgba(228,236,239,.14);
-  --btn:#16252C; --btn-on:#E4ECEF; --btn-on-ink:#0E1920; --sgg:rgba(228,236,239,.52); --sido:rgba(228,236,239,.88); --casing:rgba(14,25,32,.55); --coast:rgba(228,236,239,.3); }
+  --btn:#16252C; --btn-on:#E4ECEF; --btn-on-ink:#0E1920; --sgg:rgba(228,236,239,.52); --sido:rgba(228,236,239,.88); --casing:rgba(14,25,32,.55); --coast:rgba(228,236,239,.3); --land:#26333A; --line:rgba(14,25,32,.5); }
 *,*::before,*::after{box-sizing:border-box}   /* 여백·테두리를 폭 안에 포함 (휴대폰에서 조작판이 화면 밖으로 삐져나오지 않게) */
 html,body{height:100%;min-height:600px;margin:0}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{background:var(--sea);color:var(--ink);overflow:hidden;position:relative}
-#grid,#over{position:absolute;inset:0;width:100%;height:100%;display:block}
+#base,#grid,#over{position:absolute;inset:0;width:100%;height:100%;display:block}
+#base{pointer-events:none}#land{fill:var(--land);stroke:none}
 #over{touch-action:none;cursor:crosshair}
 .lvl{fill:none;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
-#coast{stroke:var(--coast);stroke-width:.6px}#sgg{stroke:var(--sgg);stroke-width:1px}#sidoCase{stroke:var(--casing);stroke-width:3px}#sido{stroke:var(--sido);stroke-width:1.4px}
+#dong{stroke:var(--line);stroke-width:.6px}#coast{stroke:var(--coast);stroke-width:.6px}#sgg{stroke:var(--sgg);stroke-width:1px}#sidoCase{stroke:var(--casing);stroke-width:3px}#sido{stroke:var(--sido);stroke-width:1.4px}
 #cell{fill:none;stroke:#E09A12;stroke-width:2px;vector-effect:non-scaling-stroke;pointer-events:none}
 .panel{position:absolute;background:var(--panel);border:1px solid var(--edge);border-radius:10px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #head{top:calc(env(safe-area-inset-top,0px) + 14px);left:14px;padding:15px 17px 13px;width:min(390px,calc(100vw - 28px))}
@@ -78,6 +79,7 @@ button:focus-visible,select:focus-visible{outline:2px solid #C0622D;outline-offs
 </style>
 </head>
 <body>
+<svg id="base" aria-hidden="true"></svg>
 <canvas id="grid" aria-hidden="true"></canvas>
 <svg id="over" role="img" aria-label="1km 격자별 산업(중분류) 종사자 수 지도"></svg>
 <section id="head" class="panel">
@@ -141,9 +143,12 @@ const over=d3.select("#over"), cv=document.getElementById("grid"), ctx=cv.getCon
 const off=document.createElement("canvas"); off.width=W; off.height=H; const octx=off.getContext("2d"); const img=octx.createImageData(W,H);
 const frame={type:"Feature",geometry:{type:"Polygon",coordinates:[[[E[0],E[1]],[E[2],E[1]],[E[2],E[3]],[E[0],E[3]],[E[0],E[1]]]]}};
 const proj=d3.geoIdentity().reflectY(true), path=d3.geoPath(proj);
-const g=over.append("g"), obj=BND.objects.sgg, sc=f=>f.properties.SGG;
-const coast=g.append("path").attr("id","coast").attr("class","lvl"), sggL=g.append("path").attr("id","sgg").attr("class","lvl"),
+// 아래부터: 육지(바탕 SVG) → 격자(캔버스) → 행정동(흰 선)·시군구·시도 경계(위 SVG)
+const base=d3.select("#base"), bg=base.append("g"), landP=bg.append("path").attr("id","land");
+const g=over.append("g"), obj=BND.objects.dong, sc=f=>f.properties.ADM_CD.slice(0,5);
+const dongL=g.append("path").attr("id","dong").attr("class","lvl"), coast=g.append("path").attr("id","coast").attr("class","lvl"), sggL=g.append("path").attr("id","sgg").attr("class","lvl"),
       sidoC=g.append("path").attr("id","sidoCase").attr("class","lvl"), sidoL=g.append("path").attr("id","sido").attr("class","lvl"), cellR=g.append("rect").attr("id","cell").attr("width",0);
+const LAND=topojson.merge(BND,obj.geometries), MDG=topojson.mesh(BND,obj,(a,b)=>a!==b&&a.properties.ADM_CD!==b.properties.ADM_CD);
 const MC=topojson.mesh(BND,obj,(a,b)=>a===b), MS=topojson.mesh(BND,obj,(a,b)=>a!==b&&sc(a)!==sc(b)), MD=topojson.mesh(BND,obj,(a,b)=>a!==b&&sc(a).slice(0,2)!==sc(b).slice(0,2));
 let Wc=0,Hc=0,left=0,T=d3.zoomIdentity; const dpr=Math.max(1,window.devicePixelRatio||1);
 function render(){ ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height); ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -151,7 +156,7 @@ function render(){ ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.
   ctx.imageSmoothingEnabled=pxPerCell<1.5; ctx.imageSmoothingQuality="high";
   ctx.drawImage(off,T.applyX(ax),T.applyY(ay),(bx-ax)*T.k,(by-ay)*T.k); }
 let raf=0; const req=()=>{ if(!raf) raf=requestAnimationFrame(()=>{ raf=0; render(); }); };
-const zoom=d3.zoom().scaleExtent([1,70]).on("zoom",e=>{ T=e.transform; g.attr("transform",T); sggL.style("opacity",Math.min(1,.8+T.k/10)); req(); });
+const zoom=d3.zoom().scaleExtent([1,70]).on("zoom",e=>{ T=e.transform; g.attr("transform",T); bg.attr("transform",T); sggL.style("opacity",Math.min(1,.8+T.k/10)); dongL.style("opacity",Math.min(1,.35+T.k*.16)); req(); });
 over.call(zoom).on("dblclick.zoom",null);
 const reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function toBox(b,dur){ const [x0,y1]=proj([b[0],b[1]]), [x1,y0]=proj([b[2],b[3]]);
@@ -159,10 +164,10 @@ function toBox(b,dur){ const [x0,y1]=proj([b[0],b[1]]), [x1,y0]=proj([b[2],b[3]]
   over.transition().duration(reduce?0:dur).call(zoom.transform,d3.zoomIdentity.translate(left+(Wc-left)/2,Hc/2).scale(k).translate(-(x0+x1)/2,-(y0+y1)/2)); }
 function size(){ const r=over.node().getBoundingClientRect(); if(r.width<50||r.height<50) return;
   if(Math.abs(r.width-Wc)<1&&Math.abs(r.height-Hc)<1) return; Wc=r.width; Hc=r.height;
-  cv.width=Math.round(Wc*dpr); cv.height=Math.round(Hc*dpr); over.attr("viewBox",`0 0 ${Wc} ${Hc}`);
+  cv.width=Math.round(Wc*dpr); cv.height=Math.round(Hc*dpr); over.attr("viewBox",`0 0 ${Wc} ${Hc}`); base.attr("viewBox",`0 0 ${Wc} ${Hc}`);
   left=Wc>780?420:0; const pad=Math.min(Wc,Hc)*0.04, top=Wc>780?0:document.getElementById('head').offsetHeight+18, bottom=Wc>780?0:document.getElementById('read').offsetHeight+18;
   proj.fitExtent([[left+pad,top+pad],[Wc-pad,Hc-bottom-pad]],frame);
-  coast.attr("d",path(MC)); sggL.attr("d",path(MS)); sidoC.attr("d",path(MD)); sidoL.attr("d",path(MD)); cellR.attr("width",0);
+  landP.attr("d",path(LAND)); dongL.attr("d",path(MDG)); coast.attr("d",path(MC)); sggL.attr("d",path(MS)); sidoC.attr("d",path(MD)); sidoL.attr("d",path(MD)); cellR.attr("width",0);
   over.call(zoom.transform,d3.zoomIdentity); req(); }
 new ResizeObserver(size).observe(over.node()); size();
 // ---------- 자료 읽기
@@ -194,7 +199,7 @@ function after(){ updCur(); history.replaceState(null,"",`#y=${S.year}&c=${S.cod
 function legend(cols,tk,unit){ const L=d3.select("#legend").html(""), n=cols.length;
   L.append("div").attr("class","bar").style("grid-template-columns",`repeat(${n},1fr)`).selectAll("span").data(cols).join("span").style("background",c=>c);
   L.append("div").attr("class","ticks").style("grid-template-columns",`repeat(${n},1fr)`).selectAll("span").data(tk).join("span").text(t=>t);
-  L.append("div").attr("class","keys").html(`<span>${unit}</span><span><i class="ln" style="border-top:1.4px solid var(--sido)"></i>시도</span><span><i class="ln" style="border-top:1px solid var(--sgg)"></i>시군구</span>`); }
+  L.append("div").attr("class","keys").html(`<span>${unit}</span><span><i class="ln" style="border-top:1.4px solid var(--sido)"></i>시도</span><span><i class="ln" style="border-top:1px solid var(--sgg)"></i>시군구</span><span><i class="ln" style="border-top:1.5px solid #FFFFFF;outline:1px solid var(--edge)"></i>행정동</span>`); }
 const updCur=()=>{ document.getElementById('cur').textContent=`${yname()} · ${label()}`; };
 const LET='가나다라마바사아';
 const cellId=(c,r)=>{ const x=E[0]+c*1000, y=E[3]-(r+1)*1000, ex=Math.floor((x-700000)/100000), ey=Math.floor((y-1300000)/100000);
