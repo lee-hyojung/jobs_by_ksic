@@ -9,15 +9,15 @@
 <style>
 :root{
   --sea:#E4EBEE; --ink:#1B2A31; --muted:#56666E; --panel:rgba(255,255,255,.95); --edge:rgba(27,42,49,.14);
-  --btn:#FFFFFF; --btn-on:#1B2A31; --btn-on-ink:#FFFFFF; --sgg:rgba(27,42,49,.38); --sido:rgba(27,42,49,.85); --casing:rgba(255,255,255,.55); --coast:rgba(27,42,49,.35);
+  --btn:#FFFFFF; --btn-on:#1B2A31; --btn-on-ink:#FFFFFF; --sgg:rgba(27,42,49,.58); --sido:rgba(27,42,49,.88); --casing:rgba(255,255,255,.55); --coast:rgba(27,42,49,.35);
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
   font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --sea:#0E1920; --ink:#E4ECEF; --muted:#9CACB3; --panel:rgba(16,27,33,.95); --edge:rgba(228,236,239,.14);
-  --btn:#16252C; --btn-on:#E4ECEF; --btn-on-ink:#0E1920; --sgg:rgba(228,236,239,.35); --sido:rgba(228,236,239,.85); --casing:rgba(14,25,32,.55); --coast:rgba(228,236,239,.3); } }
+  --btn:#16252C; --btn-on:#E4ECEF; --btn-on-ink:#0E1920; --sgg:rgba(228,236,239,.52); --sido:rgba(228,236,239,.88); --casing:rgba(14,25,32,.55); --coast:rgba(228,236,239,.3); } }
 :root[data-theme="dark"]{ --sea:#0E1920; --ink:#E4ECEF; --muted:#9CACB3; --panel:rgba(16,27,33,.95); --edge:rgba(228,236,239,.14);
-  --btn:#16252C; --btn-on:#E4ECEF; --btn-on-ink:#0E1920; --sgg:rgba(228,236,239,.35); --sido:rgba(228,236,239,.85); --casing:rgba(14,25,32,.55); --coast:rgba(228,236,239,.3); }
+  --btn:#16252C; --btn-on:#E4ECEF; --btn-on-ink:#0E1920; --sgg:rgba(228,236,239,.52); --sido:rgba(228,236,239,.88); --casing:rgba(14,25,32,.55); --coast:rgba(228,236,239,.3); }
 *,*::before,*::after{box-sizing:border-box}   /* 여백·테두리를 폭 안에 포함 (휴대폰에서 조작판이 화면 밖으로 삐져나오지 않게) */
 html,body{height:100%;min-height:600px;margin:0}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -25,7 +25,7 @@ body{background:var(--sea);color:var(--ink);overflow:hidden;position:relative}
 #grid,#over{position:absolute;inset:0;width:100%;height:100%;display:block}
 #over{touch-action:none;cursor:crosshair}
 .lvl{fill:none;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
-#coast{stroke:var(--coast);stroke-width:.6px}#sgg{stroke:var(--sgg);stroke-width:.7px}#sidoCase{stroke:var(--casing);stroke-width:3px}#sido{stroke:var(--sido);stroke-width:1.4px}
+#coast{stroke:var(--coast);stroke-width:.6px}#sgg{stroke:var(--sgg);stroke-width:1px}#sidoCase{stroke:var(--casing);stroke-width:3px}#sido{stroke:var(--sido);stroke-width:1.4px}
 #cell{fill:none;stroke:#E09A12;stroke-width:2px;vector-effect:non-scaling-stroke;pointer-events:none}
 .panel{position:absolute;background:var(--panel);border:1px solid var(--edge);border-radius:10px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #head{top:calc(env(safe-area-inset-top,0px) + 14px);left:14px;padding:15px 17px 13px;width:min(390px,calc(100vw - 28px))}
@@ -84,7 +84,7 @@ button:focus-visible,select:focus-visible{outline:2px solid #C0622D;outline-offs
   <div class="top"><h1>산업별 종사자 지도</h1><button id="toggle" class="toggle" aria-expanded="false" aria-controls="ctrl">설정 ▾</button></div>
   <p class="cur" id="cur"></p>
   <div id="ctrl">
-    <p class="sub">전국 1km 격자별 종사자 수를 산업(중분류)별로 보여 줘요. 격자에 마우스를 올리면 값과 동 이름이 나와요.</p>
+    <p class="sub">전국 1km 격자별 종사자 수를 산업(대분류·중분류)별로 보여 줘요. 연도 맨 끝의 "15→24"는 2015년에서 2024년까지의 변화예요.</p>
     <div class="row"><p class="lab">연도</p><div class="yrs" id="years"></div><p class="def" id="pnote"></p></div>
     <div class="row"><p class="lab">산업 (중분류)</p><select id="ind" aria-label="산업 선택"></select></div>
     <div class="views" role="group" aria-label="보기 범위">
@@ -116,16 +116,26 @@ try{ [IDX,BND,DONGS]=await Promise.all([getJSON('data/index.json'),getJSON('data
 const W=IDX.W,H=IDX.H,E=IDX.ext,N=W*H;                       // E = [x0,y0,x1,y1] 격자 가장자리 (EPSG:5179, m)
 const AVAIL=Object.keys(IDX.years).map(Number).sort((a,b)=>a-b);
 const norm=s=>s.replace(/[\s;,.\-·ㆍ‧∙]/g,'');
-const S={year:AVAIL[AVAIL.length-1],code:'total',data:null,msg:''}; S.period=IDX.years[S.year];
-{ const hp=new URLSearchParams(location.hash.slice(1));
-  if(hp.has('y')&&IDX.years[hp.get('y')]){ S.year=+hp.get('y'); S.period=IDX.years[S.year]; }
-  if(hp.has('c')&&(hp.get('c')==='total'||IDX.periods[S.period].items.some(i=>i.c===hp.get('c')))) S.code=hp.get('c'); }
+const DY0=2015, DY1=2024, HAS_DIFF=!!(IDX.years[DY0]&&IDX.years[DY1]);
+const S={year:IDX.years[DY1]?DY1:AVAIL[AVAIL.length-1],code:'total',data:null,a:null,b:null,msg:''}; S.period=IDX.years[S.year];
+{ const hp=new URLSearchParams(location.hash.slice(1)), hy=hp.get('y');
+  if(hy==='diff'&&HAS_DIFF){ S.year='diff'; S.period=IDX.years[DY1]; } else if(hy&&IDX.years[hy]){ S.year=+hy; S.period=IDX.years[S.year]; }
+  const hc=hp.get('c'); const P=IDX.periods[S.period];
+  if(hc&&(hc==='total'||P.items.some(i=>i.c===hc)||(P.groups||[]).some(g=>g.c===hc))) S.code=hc; }
 // ---------- 색
-const PAL=["#EFCFE3","#E3AFD2","#D08BC0","#B866AD","#9544A0","#6E2A86","#431A66"];
+const PAL=["#FFFFD4","#FEE391","#FEC44F","#FE9929","#EC7014","#CC4C02","#8C2D04"];          // ColorBrewer YlOrBr
+const BURD=["#2166AC","#67A9CF","#D1E5F0","#F7F7F7","#FDDBC7","#EF8A62","#B2182B"];         // ColorBrewer RdBu 를 뒤집은 BuRd (줄면 파랑, 늘면 빨강)
 const ramp=n=>{ if(n<=0) return [PAL[3]]; const o=[]; for(let k=0;k<=n;k++) o.push(PAL[Math.round(k*(PAL.length-1)/n)]); return o; };
 const hex=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+const nice=v=>{ if(v<10) return Math.max(1,Math.round(v)); const p=Math.pow(10,Math.floor(Math.log10(v))-1); return Math.round(v/p)*p; };
+const fmt=v=>Math.round(v).toLocaleString(), sgn=v=>(v>0?'+':v<0?'−':'')+fmt(Math.abs(v));
 const brk=()=> S.code==='total'? IDX.breaks.total : ((IDX.breaks[S.period]||{})[S.code]||[]);
-const item=()=> S.code==='total'? {c:'total',n:'전체 산업 (중분류 합계)'} : (IDX.periods[S.period].items.find(i=>i.c===S.code)||{c:S.code,n:S.code});
+// 항목 이름과 분류 차수 사이 연결 (같은 이름의 중분류, 같은 글자의 대분류)
+const label=(p=S.period,c=S.code)=> c==='total'? '전체 종사자' : c.startsWith('G_')? ((IDX.periods[p].groups||[]).find(g=>g.c===c)||{n:c}).n+' (대분류 합계)' : (IDX.periods[p].items.find(i=>i.c===c)||{n:c}).n;
+function mapCode(fromP,toP,c){ if(c==='total'||fromP===toP) return c;
+  if(c.startsWith('G_')) return (IDX.periods[toP].groups||[]).some(g=>g.c===c)? c : null;
+  const it=IDX.periods[fromP].items.find(i=>i.c===c); if(!it) return null; const m=IDX.periods[toP].items.find(i=>norm(i.n)===norm(it.n)); return m? m.c : null; }
+const yname=()=> S.year==='diff'? '2015→2024 차이' : S.year+'년';
 // ---------- 지도 틀
 const over=d3.select("#over"), cv=document.getElementById("grid"), ctx=cv.getContext("2d");
 const off=document.createElement("canvas"); off.width=W; off.height=H; const octx=off.getContext("2d"); const img=octx.createImageData(W,H);
@@ -138,10 +148,10 @@ const MC=topojson.mesh(BND,obj,(a,b)=>a===b), MS=topojson.mesh(BND,obj,(a,b)=>a!
 let Wc=0,Hc=0,left=0,T=d3.zoomIdentity; const dpr=Math.max(1,window.devicePixelRatio||1);
 function render(){ ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height); ctx.setTransform(dpr,0,0,dpr,0,0);
   const [ax,ay]=proj([E[0],E[3]]), [bx,by]=proj([E[2],E[1]]); const pxPerCell=(bx-ax)*T.k/W;
-  ctx.imageSmoothingEnabled=pxPerCell<1.5; ctx.imageSmoothingQuality="high";            // 아주 멀리서는 칸이 사라지지 않게 부드럽게, 가까이서는 칸 모양 그대로
+  ctx.imageSmoothingEnabled=pxPerCell<1.5; ctx.imageSmoothingQuality="high";
   ctx.drawImage(off,T.applyX(ax),T.applyY(ay),(bx-ax)*T.k,(by-ay)*T.k); }
 let raf=0; const req=()=>{ if(!raf) raf=requestAnimationFrame(()=>{ raf=0; render(); }); };
-const zoom=d3.zoom().scaleExtent([1,70]).on("zoom",e=>{ T=e.transform; g.attr("transform",T); sggL.style("opacity",Math.min(1,.35+T.k/5)); req(); });
+const zoom=d3.zoom().scaleExtent([1,70]).on("zoom",e=>{ T=e.transform; g.attr("transform",T); sggL.style("opacity",Math.min(1,.8+T.k/10)); req(); });
 over.call(zoom).on("dblclick.zoom",null);
 const reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function toBox(b,dur){ const [x0,y1]=proj([b[0],b[1]]), [x1,y0]=proj([b[2],b[3]]);
@@ -157,55 +167,82 @@ function size(){ const r=over.node().getBoundingClientRect(); if(r.width<50||r.h
 new ResizeObserver(size).observe(over.node()); size();
 // ---------- 자료 읽기
 const cache=new Map();
-const getCached=k=>{ if(!cache.has(k)){ if(cache.size>24) cache.delete(cache.keys().next().value);
+const getCached=k=>{ if(!cache.has(k)){ if(cache.size>30) cache.delete(cache.keys().next().value);
   cache.set(k,getGz(`data/${k}.bin.gz`).then(u=>new Uint32Array(u.buffer,u.byteOffset,N))); } return cache.get(k); };
-async function load(){ const k=`${S.year}/${S.code}`; d3.select("#readc").html(`<p class="how">${item().n} 자료를 불러오는 중…</p>`);
-  try{ const b=await getCached(k); if(`${S.year}/${S.code}`!==k) return; S.data=b; paint(); }catch(e){ err(String(e)); } }
-// ---------- 색칠·범례·요약
-function paint(){ if(!S.data) return; const br=brk(), cols=ramp(br.length), rgb=cols.map(hex), px=img.data, D=S.data;
+async function load(){ const k=`${S.year}/${S.code}`; d3.select("#readc").html(`<p class="how">${label()} 자료를 불러오는 중…</p>`);
+  try{
+    if(S.year==='diff'){ const c0=mapCode(S.period,IDX.years[DY0],S.code);
+      const [a,b]=await Promise.all([getCached(`${DY0}/${c0}`),getCached(`${DY1}/${S.code}`)]); if(`${S.year}/${S.code}`!==k) return;
+      S.a=a; S.b=b; S.c0=c0; S.data=null; paintDiff(); }
+    else { const b=await getCached(k); if(`${S.year}/${S.code}`!==k) return; S.data=b; S.a=S.b=null; paint(); }
+  }catch(e){ err(String(e)); } }
+// ---------- 색칠 (한 해)
+function paint(){ const br=brk(), cols=ramp(br.length), rgb=cols.map(hex), px=img.data, D=S.data;
   for(let i=0;i<N;i++){ const v=D[i], o=i*4; if(v===0){ px[o+3]=0; continue; } let k=0; while(k<br.length&&v>=br[k]) k++; const c=rgb[k]; px[o]=c[0]; px[o+1]=c[1]; px[o+2]=c[2]; px[o+3]=255; }
-  octx.putImageData(img,0,0); req(); legend(cols,br); summary(); updCur(); history.replaceState(null,"",`#y=${S.year}&c=${S.code}`); }
-function legend(cols,br){ const L=d3.select("#legend").html(""), n=cols.length;
+  octx.putImageData(img,0,0); req(); legend(cols,[""].concat(br.map(b=>b.toLocaleString())),"1km 칸당 종사자 수(명)"); summary(); after(); }
+// ---------- 색칠 (2015→2024 차이): 칸마다 2024 − 2015, 구간은 변화 크기의 분위수로 좌우 대칭
+function paintDiff(){ const a=S.a, b=S.b, px=img.data; const ab=[];
+  for(let i=0;i<N;i++){ if(a[i]||b[i]){ const d=b[i]-a[i]; if(d) ab.push(Math.abs(d)); } }
+  ab.sort((x,y)=>x-y); const q=p=> ab.length? ab[Math.min(ab.length-1,Math.floor(p*(ab.length-1)))] : 1;
+  const b1=Math.max(2,nice(q(.4))), b2=Math.max(b1+1,nice(q(.8))), b3=Math.max(b2+1,nice(q(.96))); S.dbr=[b1,b2,b3];
+  const rgb=BURD.map(hex); let inc=0,dec=0;
+  for(let i=0;i<N;i++){ const o=i*4; if(!a[i]&&!b[i]){ px[o+3]=0; continue; } const d=b[i]-a[i]; if(d>0) inc++; else if(d<0) dec++;
+    const k= d<=-b3?0 : d<=-b2?1 : d<=-b1?2 : d<b1?3 : d<b2?4 : d<b3?5 : 6; const c=rgb[k]; px[o]=c[0]; px[o+1]=c[1]; px[o+2]=c[2]; px[o+3]=255; }
+  S.inc=inc; S.dec=dec; octx.putImageData(img,0,0); req();
+  legend(BURD,["",`−${fmt(b3)}`,`−${fmt(b2)}`,`−${fmt(b1)}`,`+${fmt(b1)}`,`+${fmt(b2)}`,`+${fmt(b3)}`],"2015→2024 칸당 종사자 변화(명)"); summary(); after(); }
+function after(){ updCur(); history.replaceState(null,"",`#y=${S.year}&c=${S.code}`); }
+function legend(cols,tk,unit){ const L=d3.select("#legend").html(""), n=cols.length;
   L.append("div").attr("class","bar").style("grid-template-columns",`repeat(${n},1fr)`).selectAll("span").data(cols).join("span").style("background",c=>c);
-  L.append("div").attr("class","ticks").style("grid-template-columns",`repeat(${n},1fr)`).selectAll("span").data([""].concat(br.map(b=>b.toLocaleString()))).join("span").text(t=>t);
-  L.append("div").attr("class","keys").html(`<span>1km 칸당 종사자 수(명)</span><span><i class="ln" style="border-top:1.4px solid var(--sido)"></i>시도</span><span><i class="ln" style="border-top:1px solid var(--sgg)"></i>시군구</span>`); }
-const updCur=()=>{ document.getElementById('cur').textContent=`${S.year}년 · ${item().n}`; };
+  L.append("div").attr("class","ticks").style("grid-template-columns",`repeat(${n},1fr)`).selectAll("span").data(tk).join("span").text(t=>t);
+  L.append("div").attr("class","keys").html(`<span>${unit}</span><span><i class="ln" style="border-top:1.4px solid var(--sido)"></i>시도</span><span><i class="ln" style="border-top:1px solid var(--sgg)"></i>시군구</span>`); }
+const updCur=()=>{ document.getElementById('cur').textContent=`${yname()} · ${label()}`; };
 const LET='가나다라마바사아';
 const cellId=(c,r)=>{ const x=E[0]+c*1000, y=E[3]-(r+1)*1000, ex=Math.floor((x-700000)/100000), ey=Math.floor((y-1300000)/100000);
   return LET[ex]+LET[ey]+String(Math.floor(((x-700000)%100000)/1000)).padStart(2,"0")+String(Math.floor(((y-1300000)%100000)/1000)).padStart(2,"0"); };
 const dname=i=> (i>=0&&i<65535)? `${DONGS.s[i]} ${DONGS.g[i]} ${DONGS.n[i]}` : '';
-function summary(){ if(!S.data) return; const st=(IDX.stats[S.year]||{})[S.code], R=d3.select("#readc");
-  const head=`<p class="name">${item().n}</p><p class="where">${S.year}년 · ${IDX.periods[S.period].label}</p>`;
+function summary(){ const R=d3.select("#readc");
+  if(S.year==='diff'){ if(!S.a) return; const s0=((IDX.stats[DY0]||{})[S.c0]||{}).sum||0, s1=((IDX.stats[DY1]||{})[S.code]||{}).sum||0, d=s1-s0;
+    R.html(`<p class="name">${label()}</p><p class="where">2015 → 2024년 차이 (전국 합계)</p><p class="big">${sgn(d)}<small>명${s0?` (${d>=0?'+':'−'}${Math.abs(d/s0*100).toFixed(1)}%)`:''}</small></p>
+      <dl class="stats"><dt>2015년 합계</dt><dd>${fmt(s0)}명</dd><dt>2024년 합계</dt><dd>${fmt(s1)}명</dd><dt>늘어난 칸</dt><dd>${fmt(S.inc)}개</dd><dt>줄어든 칸</dt><dd>${fmt(S.dec)}개</dd></dl>
+      <p class="how">격자에 마우스를 올리면 그 칸의 두 해 값이 나와요. 2020년에 종사자 통계 작성 방식이 바뀌어 전국 합계가 9.8% 뛰었으니, 늘어난 값에는 그 영향도 섞여 있어요.</p>`); return; }
+  if(!S.data) return; const st=(IDX.stats[S.year]||{})[S.code];
+  const head=`<p class="name">${label()}</p><p class="where">${S.year}년 전국 · ${IDX.periods[S.period].label}</p>`;
   if(!st){ R.html(head+`<p class="how">이 연도의 통계가 없어요.</p>`); return; }
-  R.html(head+`<dl class="stats"><dt>전국 합계(격자 합)</dt><dd>${st.sum.toLocaleString()}명</dd><dt>값이 있는 칸</dt><dd>${st.n.toLocaleString()}개</dd>
-    <dt>가장 큰 칸</dt><dd>${st.max.toLocaleString()}명</dd><dt></dt><dd>${st.mc>=0?dname(DONG[st.mc]):''}</dd></dl>
+  R.html(head+`<p class="big">${fmt(st.sum)}<small>명</small></p><dl class="stats"><dt>값이 있는 칸</dt><dd>${fmt(st.n)}개</dd>
+    <dt>가장 큰 칸</dt><dd>${fmt(st.max)}명</dd><dt></dt><dd>${st.mc>=0?dname(DONG[st.mc]):''}</dd></dl>
     <p class="how">격자에 마우스를 올리면 그 칸의 값과 동 이름이 나와요. 1~2명인 칸은 값이 공개되지 않아 비어 있을 수 있어요.</p>`); }
 function cellAt(mx,my){ const [ux,uy]=T.invert([mx,my]); const [x,y]=proj.invert([ux,uy]); const c=Math.floor((x-E[0])/1000), r=Math.floor((E[3]-y)/1000); return (c<0||r<0||c>=W||r>=H)? -1 : r*W+c; }
-function showCell(i){ const v=S.data[i], di=DONG[i];
-  if(v===0&&di===65535){ cellR.attr("width",0); summary(); return; }
+function showCell(i){ const di=DONG[i], dif=S.year==='diff'; const v=dif? null : S.data[i], v0=dif? S.a[i]:0, v1=dif? S.b[i]:0;
+  if((dif? (!v0&&!v1) : v===0)&&di===65535){ cellR.attr("width",0); summary(); return; }
   const c=i%W, r=Math.floor(i/W), [x0,y0]=proj([E[0]+c*1000,E[3]-r*1000]), [x1,y1]=proj([E[0]+(c+1)*1000,E[3]-(r+1)*1000]);
   cellR.attr("x",x0).attr("y",y0).attr("width",x1-x0).attr("height",y1-y0);
-  d3.select("#readc").html(`<p class="name">${di<65535?DONGS.n[di]:'(행정동 밖)'}</p><p class="where">${di<65535?DONGS.s[di]+' '+DONGS.g[di]+' · ':''}격자 ${cellId(c,r)}</p>
-   <p class="big">${v>0?v.toLocaleString()+'<small>명</small>':'—'}</p><p class="how">${item().n}, ${S.year}년${v===0?' · 값이 없는 칸이에요(종사자가 없거나 비공개)':''}</p>`); }
-const move=e=>{ if(!S.data) return; const [mx,my]=d3.pointer(e), i=cellAt(mx,my); if(i<0){ cellR.attr("width",0); return; } showCell(i); };
-over.on("pointermove",move).on("pointerdown",move).on("pointerleave",()=>{ cellR.attr("width",0); summary(); });
-// ---------- 조작: 연도, 산업
-function fillSelect(){ const p=IDX.periods[S.period], sel=d3.select("#ind").html("");
-  sel.append("option").attr("value","total").text("전체 산업 (중분류 합계)");
+  const hd=`<p class="name">${di<65535?DONGS.n[di]:'(행정동 밖)'}</p><p class="where">${di<65535?DONGS.s[di]+' '+DONGS.g[di]+' · ':''}격자 ${cellId(c,r)}</p>`;
+  if(dif) d3.select("#readc").html(hd+`<p class="big">${(v0||v1)?sgn(v1-v0)+'<small>명</small>':'—'}</p><p class="how">2015년 ${fmt(v0)}명 → 2024년 ${fmt(v1)}명 · ${label()}</p>`);
+  else d3.select("#readc").html(hd+`<p class="big">${v>0?fmt(v)+'<small>명</small>':'—'}</p><p class="how">${label()}, ${S.year}년${v===0?' · 값이 없는 칸이에요(종사자가 없거나 비공개)':''}</p>`); }
+const ready=()=> S.year==='diff'? !!S.a : !!S.data;
+const move=e=>{ if(!ready()) return; const [mx,my]=d3.pointer(e), i=cellAt(mx,my); if(i<0){ cellR.attr("width",0); return; } showCell(i); };
+over.on("pointermove",move).on("pointerdown",move).on("pointerleave",()=>{ cellR.attr("width",0); if(ready()) summary(); });
+// ---------- 조작: 연도(마지막은 2015→2024 차이), 산업(전체·대분류 합계·중분류)
+function fillSelect(){ const p=IDX.periods[S.period], sel=d3.select("#ind").html(""), dif=S.year==='diff', p0=dif? IDX.years[DY0] : null;
+  const lab=(c,txt)=>{ if(dif&&mapCode(S.period,p0,c)===null) return [txt+' (2015년에 없음)',true]; const st=dif? null : (IDX.stats[S.year]||{})[c]; return [txt+(st&&st.n===0?' (자료 없음)':''),false]; };
+  sel.append("option").attr("value","total").text("전체 종사자 (모든 산업)");
+  if((p.groups||[]).length){ const og=sel.append("optgroup").attr("label","대분류 합계"); p.groups.forEach(gr=>{ const [t,d]=lab(gr.c,gr.n); og.append("option").attr("value",gr.c).text(t).property("disabled",d); }); }
   for(const [gname,items] of d3.group(p.items,d=>d.g||"")){ const par=gname? sel.append("optgroup").attr("label",gname) : sel;
-    items.forEach(it=>{ const st=(IDX.stats[S.year]||{})[it.c]; par.append("option").attr("value",it.c).text(`${it.c} ${it.n}${st&&st.n===0?' (자료 없음)':''}`); }); }
+    items.forEach(it=>{ const [t,d]=lab(it.c,`${it.c} ${it.n}`); par.append("option").attr("value",it.c).text(t).property("disabled",d); }); }
   sel.property("value",S.code); }
-function yearButtons(){ d3.select("#years").selectAll("button").data(IDX.yearsAll).join("button").attr("data-y",d=>d).text(d=>d)
-  .attr("disabled",d=>IDX.years[d]?null:"").attr("aria-pressed",d=>String(d===S.year)).attr("title",d=>IDX.years[d]?IDX.periods[IDX.years[d]].label:"자료 준비 중")
+function yearButtons(){ const ys=IDX.yearsAll.concat(HAS_DIFF?['diff']:[]);
+  d3.select("#years").selectAll("button").data(ys).join("button").attr("data-y",d=>d).text(d=>d==='diff'?'15→24':d)
+  .attr("disabled",d=>d==='diff'||IDX.years[d]?null:"").attr("aria-pressed",d=>String(d===S.year))
+  .attr("title",d=>d==='diff'?'2015년과 2024년의 차이':IDX.years[d]?IDX.periods[IDX.years[d]].label:"자료 준비 중").attr("aria-label",d=>d==='diff'?'2015년에서 2024년까지의 차이':null)
   .on("click",(e,d)=>setYear(d));
-  const yrs=AVAIL.filter(y=>IDX.years[y]===S.period);
-  d3.select("#pnote").text(`${IDX.periods[S.period].label} 적용 연도: ${yrs.join(", ")}. ${S.msg||'분류 차수가 다른 연도 사이에는 같은 이름의 산업만 이어서 볼 수 있어요.'}`); }
-function setYear(y){ if(!IDX.years[y]||y===S.year) return; const oldP=S.period, newP=IDX.years[y]; S.msg='';
-  if(newP!==oldP){ const old=S.code==='total'?null:IDX.periods[oldP].items.find(i=>i.c===S.code); let code='total';
-    if(old){ const m=IDX.periods[newP].items.find(i=>norm(i.n)===norm(old.n)); if(m) code=m.c; else S.msg=`'${old.n}'은(는) ${IDX.periods[newP].label}에 같은 이름이 없어 전체 산업으로 바꿨어요.`; }
-    S.period=newP; S.code=code; S.year=y; } else S.year=y;
-  fillSelect();
-  yearButtons(); load(); }
+  if(S.year==='diff') d3.select("#pnote").text(`2024년 값 − 2015년 값이에요(${IDX.periods[IDX.years[DY0]].label} → ${IDX.periods[IDX.years[DY1]].label}). 중분류는 이름이 같은 것끼리, 대분류는 같은 글자끼리 이어요. ${S.msg}`);
+  else { const yrs=AVAIL.filter(y=>IDX.years[y]===S.period);
+    d3.select("#pnote").text(`${IDX.periods[S.period].label} 적용 연도: ${yrs.join(", ")}. ${S.msg||'분류 차수가 다른 연도 사이에는 같은 이름의 산업만 이어서 볼 수 있어요.'}`); } }
+function setYear(y){ if(y===S.year) return; const newP= y==='diff'? IDX.years[DY1] : IDX.years[y]; if(!newP) return; S.msg='';
+  if(newP!==S.period){ const nm=label(), c=mapCode(S.period,newP,S.code);
+    if(c===null){ S.msg=`'${nm}'은(는) ${IDX.periods[newP].label}에 같은 항목이 없어 전체 종사자로 바꿨어요.`; S.code='total'; } else S.code=c; S.period=newP; }
+  if(y==='diff'&&S.code!=='total'&&mapCode(S.period,IDX.years[DY0],S.code)===null){ S.msg=`'${label()}'은(는) 2015년에 같은 항목이 없어 전체 종사자로 바꿨어요.`; S.code='total'; }
+  S.year=y; fillSelect(); yearButtons(); load(); }
 d3.select("#ind").on("change",function(){ S.code=this.value; S.msg=''; yearButtons(); load(); });
 d3.selectAll(".views button").on("click",function(){ const v=this.dataset.v; if(v==='all') over.transition().duration(reduce?0:650).call(zoom.transform,d3.zoomIdentity); else toBox(IDX.views[v],650); });
 // 모바일: 조작판 접기·펼치기
